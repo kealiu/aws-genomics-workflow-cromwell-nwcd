@@ -1,10 +1,12 @@
 # 使用说明
 
+[Github Repo](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd)
+
 ## 代码 S3 Bucket
 
 上传代码到s3 bucket: 因为cloudformation yaml模版以及自定义的文件、script需要能够下载，所以，我们需要讲本repo代码上传到一个s3 bucket。可以新建或者用已有的，确保当前使用的`aws iam user` 有对应的bucket访问权限。将 `nwcdcromwell` 目录上传到你的S3 `Bucket`。 
     1. 通过web UI 方式上传：
-        ![code-s3-bucket-upload-folder](code-s3-bucket-upload-folder.png)
+        ![code-s3-bucket-upload-folder](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/docs/images/code-s3-bucket-upload-folder.png)
     1. 通过 `aws cli` 方式上传: `aws s3 cp -r nwcdcromwell s3://<your-bucket>/`
 
 ## Cromwell 环境部署
@@ -16,9 +18,9 @@ Cromwell运行需要使用到s3，可以新建或者用已有的，确保当前�
 ### 运行Cloudformation 模版
 
 1. 进入到Cloudformation 服务，新建stack。如图，复制 `nwcdcromwell\cn-gwfcore-root.template.yaml` 的URL
-    ![code-s3-bucket-root-template](code-s3-bucket-root-template.png)
+    ![code-s3-bucket-root-template](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/docs/images/code-s3-bucket-root-template.png)
 1. 新建Cloudformation Stack，填入 `nwcdcromwell\cn-gwfcore-root.template.yaml` 的URL 
-    ![cf-create-stack](cf-create-stack.png)
+    ![cf-create-stack](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/docs/images/cf-create-stack.png)
 1. 填入stack名字（英文）
 1. 填写参数，具体说明如下：
     1. S3 Bucket Name: Cromwell 用的S3 Bucket
@@ -40,7 +42,7 @@ Cromwell运行需要使用到s3，可以新建或者用已有的，确保当前�
 1. 下一步，根据情况修改
 1. 创建前Review。 注意：最下面的两个 check box 一定要勾选。 然后创建。等待环境搭建完成
 1. 记录下创建完成后的`PublicIp`。该IP为Cromwell Server的运行IP
-    ![cf-stack-output](cf-stack-output.png)
+    ![cf-stack-output](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/docs/images/cf-stack-output.png)
 
 ## 执行Hello World任务
 
@@ -69,7 +71,7 @@ curl -X POST "http://localhost:8000/api/workflows/v1" \
 
 ### 通过AWS Batch Dashboard 检查运行结果
 
-![batch-dashboard](batch-dashboard.png)
+![batch-dashboard](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/docs/images/batch-dashboard.png)
 
 ## 运行大型任务GATK HaplotypeCaller
 
@@ -105,7 +107,7 @@ curl -X POST "http://localhost:8000/api/workflows/v1" \
 ### 单个 AWS Batch Jobs logs
 
 在 各个 Jobs 详情页面，`Log stream name` 标记了logs位置。点击前往。一般任务 FAILED 时，可以通过该log调查。
-![batch-job-detail](batch-job-detail.png)
+![batch-job-detail](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/docs/images/batch-job-detail.png)
 
 # 参考
 - https://github.com/Iwillsky/cromwellcn
