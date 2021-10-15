@@ -1,0 +1,442 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  (WWPS-GLS-WF-GWFCORE) Genomics workflow core execution environment
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Required
+        Parameters:
+          - S3BucketName
+          - ExistingBucket
+          - TemplateRootUrl
+          - S3BucketAndPrefix
+          - VpcId
+          - SubnetIds
+          - KeypairName
+          - DBUsername
+          - DBPassword
+      - Label:
+          default: Optional
+        Parameters:
+          - Namespace
+          - DefaultCEMinvCpus
+          - DefaultCEMaxvCpus
+          - PriorityCEMinvCpus
+          - PriorityCEMaxvCpus
+      - Label:
+          default: Distribution Configuration
+        Parameters:
+          - ArtifactBucketName
+          - ArtifactBucketPrefix
+          - ServerInstanceType
+
+    ParameterLabels:
+      S3BucketName:
+        default: S3 Bucket Name
+      ExistingBucket:
+        default: Existing Bucket?
+      VpcId:
+        default: VPC ID
+      SubnetIds:
+        default: VPC Subnet IDs
+      DefaultCEMinvCpus:
+        default: Default Min vCPU
+      DefaultCEMaxvCpus:
+        default: Default Max vCPU
+      PriorityCEMinvCpus:
+        default: High Priority Min vCPU
+      PriorityCEMaxvCpus:
+        default: High Priority Max vCPU
+      ArtifactBucketName:
+        default: Artifact S3 Bucket Name
+      ArtifactBucketPrefix:
+        default: Artifact S3 Prefix
+      TemplateRootUrl:
+        default: Template Root URL
+      ServerInstanceType:
+        default: The Cromwell Server Instance Type
+      KeypairName:
+        default: Keypaire For Login Cromwell Server
+      DBUsername:
+        default: Database Username
+      DBPassword:
+        default: Database Password
+      DockerStorageVolumeSize:
+        default: Worker Runtime Disk Size
+      S3BucketAndPrefix:
+        default: S3 Pathname of Artifacts
+
+Parameters:
+  Namespace:
+    Type: String
+    Description: '[optional] namespace (e.g. project name) to use to label resources. If not specified the stack-name will be used.'
+    Default: ""
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: '[*REQUIRED] The VPC to create security groups and deploy AWS Batch to. NOTE: Must be the same VPC as the provided subnet IDs.'
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: 'Subnets you want your batch compute environment to launch in. We recommend private subnets. NOTE: Must be from the VPC provided.'
+  S3BucketName:
+    Description: >-
+      [*REQUIRED] A S3 bucket name for storing analysis results.
+      The bucket name must respect the S3 bucket naming conventions 
+      (can contain lowercase letters, numbers, periods and hyphens).
+    Type: String
+    AllowedPattern: "((?=^.{3,63}$)(?!^(\\d+\\.)+\\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])\\.)*([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])$)|(^.{0}$))"
+    ConstraintDescription: "Must respect AWS naming conventions"
+  ExistingBucket:
+    Description: Does this bucket already exist?
+    Type: String
+    AllowedValues:
+      - Yes
+      - No
+    Default: Yes
+  DefaultCEMinvCpus:
+    Description: The minimum number of CPUs for the default Batch Compute Environment
+    Type: Number
+    Default: 0
+  DefaultCEMaxvCpus:
+    Description: The maximum number of CPUs for the default Batch Compute Environment
+    Type: Number
+    Default: 100
+  PriorityCEMinvCpus:
+    Description: The minimum number of CPUs for the high-priority Batch Compute Environment
+    Type: Number
+    Default: 0
+  PriorityCEMaxvCpus:
+    Description: The maximum number of CPUs for the high-priority Batch Compute Environment
+    Type: Number
+    Default: 100
+  ArtifactBucketName:
+    Type: String
+    Default: aws-genomics-workflows
+    Description: >-
+      S3 Bucket where distrubution artifacts and additions scripts are stored
+  ArtifactBucketPrefix:
+    Type: String
+    Default: v3.0.3/artifacts  #
+    Description: >-
+      Prefix in ArtifactBucketName where distribution artifacts and additions scripts are stored
+  TemplateRootUrl:
+    Type: String
+    Description: >-
+      [*REQUIRED] Root URL for where nested templates are stored. Typically the S3 URL path of this yaml file. e.g. "https://<code-bucket-name>.s3.cn-northwest-1.amazonaws.com.cn/nwcdcromwell"
+    ConstraintDescription: >-
+      Must be a valid S3 HTTP URL
+  
+  ServerInstanceType:
+    Description: >-
+      EC2 instance type.  Cromwell itself does not require much compute power. 
+      A t3.medium should be sufficient. Larger instances are recommended for concurrent workflow scenarios.
+      If you want to run this server on the free tier, use a t3.micro.
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+    - t3.micro
+    - t3.medium
+    - t3.large
+    - t3.xlarge
+    - t3.2xlarge
+    - m5.large
+    - m5.xlarge
+  KeypairName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must specify an admin access key pair for instances.
+    Description: >-
+      [*REQUIRED] Amazon EC2 Key Pair of server for admin access.
+  DBUsername:
+    Type: String
+    Description: >-
+      [*REQUIRED] The master username for the Aurora MySQL RDS cluster that will be used as Cromwell's database
+    Default: cromwell
+    MaxLength: 16
+    MinLength: 1
+    AllowedPattern: "^[a-zA-Z]{1}[a-zA-Z0-9]{0,15}$"
+    ConstraintDescription: >-
+      DBUsername must have 1 to 16 alphanumeric characters. First character must be a letter
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: >-
+      [*REQUIRED] The master password for the Aurora MySQL RDS cluster that will be used as Cromwell's database
+    MinLength: 8
+    AllowedPattern: '^[ -~][^"@/]{7,}$'
+    ConstraintDescription: >-
+      DBPassword must have at least 8 printable ASCII characters. Can't contain any of the following: / (slash), "(double quote) and @ (at sign).
+  DockerStorageVolumeSize:
+    Type: Number
+    Default: 300
+    Description: '[optional]The initial size of the volume Docker will use for image and metadata storage (GB)'
+  S3BucketAndPrefix:
+    Type: String
+    Description: '[*REQUIRED] The S3 bucket pathname of "nwcdcromwell/artifacts", e.g: "s3://<YOUR CODE BUCKET>/nwcdcromwell/artifacts"'
+
+Conditions:
+  NoNamespace: !Equals [ !Ref Namespace, "" ]
+
+Resources:
+  S3Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateRootUrl}/cn-gwfcore-s3.template.yaml
+      TimeoutInMinutes: 5
+      Parameters:
+        Namespace:
+          Fn::If:
+            - NoNamespace
+            - !Sub ${AWS::StackName}
+            - !Ref Namespace
+        S3BucketName: !Ref S3BucketName
+        ExistingBucket: !Ref ExistingBucket
+  
+  IamStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: S3Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateRootUrl}/cn-gwfcore-iam.template.yaml
+      TimeoutInMinutes: 10
+      Parameters:
+        Namespace:
+          Fn::If:
+            - NoNamespace
+            - !Sub ${AWS::StackName}
+            - !Ref Namespace
+        S3BucketName: !Sub ${S3Stack.Outputs.BucketName}
+  
+  CodeStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateRootUrl}/cn-gwfcore-code.template.yaml
+      Parameters:
+        Namespace:
+          Fn::If:
+            - NoNamespace
+            - !Sub ${AWS::StackName}
+            - !Ref Namespace
+        InstallBucketName: !Sub ${S3Stack.Outputs.BucketName}
+        ArtifactBucketName: !Ref ArtifactBucketName
+        ArtifactBucketPrefix: !Ref ArtifactBucketPrefix
+
+  LaunchTplStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateRootUrl}/cn-gwfcore-launch-template.template.yaml
+      Parameters:
+        Namespace:
+          Fn::If:
+            - NoNamespace
+            - !Sub ${AWS::StackName}
+            - !Ref Namespace
+        KeypairName: !Ref KeypairName
+        DockerStorageVolumeSize: !Ref DockerStorageVolumeSize
+        LaunchTemplateNamePrefix: !Sub ${AWS::StackName}
+        S3BucketAndPrefix: !Ref S3BucketAndPrefix
+  
+  BatchStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - IamStack
+      - LaunchTplStack
+    Properties:
+      TemplateURL: !Sub ${TemplateRootUrl}/cn-gwfcore-batch.template.yaml
+      TimeoutInMinutes: 10
+      Parameters:
+        Namespace:
+          Fn::If:
+            - NoNamespace
+            - !Sub ${AWS::StackName}
+            - !Ref Namespace
+        LaunchTemplateId: !Sub ${LaunchTplStack.Outputs.LaunchTemplateId}
+        VpcId: !Ref VpcId
+        SubnetIds: !Join [",", !Ref SubnetIds ]
+        DefaultCEMinvCpus: !Ref DefaultCEMinvCpus
+        DefaultCEMaxvCpus: !Ref DefaultCEMaxvCpus
+        PriorityCEMinvCpus: !Ref PriorityCEMinvCpus
+        PriorityCEMaxvCpus: !Ref PriorityCEMaxvCpus
+        BatchServiceRoleArn: !Sub ${IamStack.Outputs.BatchServiceRoleArn}
+        Ec2InstanceProfileArn: !Sub ${IamStack.Outputs.BatchInstanceProfileArn}
+        SpotFleetRoleArn: !Sub ${IamStack.Outputs.BatchSpotFleetRoleArn}
+
+  CromwellStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - CodeStack
+      - BatchStack
+    Properties:
+      TemplateURL: !Sub ${TemplateRootUrl}/new-cn-cromwell-resources.template.yaml
+      TimeoutInMinutes: 20
+      Parameters:
+        Namespace: !Join ['-', ['cromwell', !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]]]
+        InstanceType: !Ref ServerInstanceType
+        VpcId: !Ref VpcId
+        BatchQueue: !Sub ${BatchStack.Outputs.DefaultJobQueueArn}
+        S3Bucket: !Ref S3BucketName
+        DBSubnetIDs: !Join [",", !Ref SubnetIds ]
+        DBUsername: !Ref DBUsername
+        DBPassword: !Ref DBPassword
+        InstanceName: !Ref AWS::StackName
+        ServerSubnetID: !Select [ "0", !Ref SubnetIds]
+        KeypairName: !Ref KeypairName
+
+  ParamS3Bucket:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name:
+        Fn::Sub:
+          - /gwfcore/${namespace}/s3-bucket
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+      Type: String #required
+      Value: !Sub ${S3Stack.Outputs.BucketName} #required
+      Description: GWFCore S3 Bucket
+  
+  ParamDefaultJobQueue:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name:
+        Fn::Sub:
+          - /gwfcore/${namespace}/job-queue/default
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+
+      Type: String #required
+      Value: !Sub ${BatchStack.Outputs.DefaultJobQueueArn} #required
+      Description: GWFCore Default AWS Batch Job Queue
+  
+  ParamPriorityJobQueue:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name:
+        Fn::Sub:
+          - /gwfcore/${namespace}/job-queue/priority
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+      Type: String #required
+      Value: !Sub ${BatchStack.Outputs.PriorityJobQueueArn} #required
+      Description: GWFCore Priority AWS Batch Job Queue
+  
+  ParamAdditionsRepoName:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: 
+        Fn::Sub:
+          - /gwfcore/${namespace}/additions-repository/name
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+      Type: String #required
+      Value: !Sub ${CodeStack.Outputs.EcsAdditionsRepoName} #required
+      Description: GWFCore ECS Additions Repository Name
+  
+  ParamAdditionsRepoCloneUrlHttp:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: 
+        Fn::Sub:
+          - /gwfcore/${namespace}/additions-repository/clone-url-http
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+      Type: String #required
+      Value: !Sub ${CodeStack.Outputs.EcsAdditionsRepoCloneUrlHttp} #required
+      Description: GWFCore ECS Additions Repository HTTP Clone Url
+  
+  ParamInstalledArtifactsBucket:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: 
+        Fn::Sub:
+          - /gwfcore/${namespace}/installed-artifacts/bucket
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+      Type: String #required
+      Value: !Sub ${CodeStack.Outputs.InstalledArtifactsBucket} #required
+      Description: GWFCore S3 Bucket for Installed Artifacts
+  
+  ParamInstalledArtifactsPrefix:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: 
+        Fn::Sub:
+          - /gwfcore/${namespace}/installed-artifacts/prefix
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+      Type: String #required
+      Value: !Sub ${CodeStack.Outputs.InstalledArtifactsPrefix} #required
+      Description: GWFCore S3 Prefix for Installed Artifacts
+  
+  ParamInstalledArtifactsS3RootUrl:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: 
+        Fn::Sub:
+          - /gwfcore/${namespace}/installed-artifacts/s3-root-url
+          - namespace: 
+              Fn::If:
+                - NoNamespace
+                - !Sub ${AWS::StackName}
+                - !Ref Namespace
+      Type: String #required
+      Value: !Sub ${CodeStack.Outputs.InstalledArtifactsS3RootUrl} #required
+      Description: GWFCore S3 Root Url for Installed Artifacts
+
+Outputs:
+  S3BucketName:
+    Value: !Sub ${S3Stack.Outputs.BucketName}
+  BatchJobRoleArn:
+    Value: !Sub ${IamStack.Outputs.BatchJobRoleArn}
+  DefaultJobQueueArn:
+    Value: !Sub ${BatchStack.Outputs.DefaultJobQueueArn}
+  PriorityJobQueueArn:
+    Value: !Sub ${BatchStack.Outputs.PriorityJobQueueArn}
+  ParamS3Bucket:
+    Value: !Ref ParamS3Bucket
+  ParamDefaultJobQueue:
+    Value: !Ref ParamDefaultJobQueue
+  ParamPriorityJobQueue:
+    Value: !Ref ParamPriorityJobQueue
+  ParamAdditionsRepoName:
+    Value: !Ref ParamAdditionsRepoName
+  ParamAdditionsRepoCloneUrlHttp:
+    Value: !Ref ParamAdditionsRepoCloneUrlHttp
+  ParamInstalledArtifactsBucket:
+    Value: !Ref ParamInstalledArtifactsBucket
+  ParamInstalledArtifactsPrefix:
+    Value: !Ref ParamInstalledArtifactsPrefix
+  ParamInstalledArtifactsS3RootUrl:
+    Value: !Ref ParamInstalledArtifactsS3RootUrl
+  CromwellVersion:
+    Value: !Sub ${CromwellStack.Outputs.CromwellVersion}
+  EC2Instance:
+    Value: !Sub ${CromwellStack.Outputs.EC2Instance}
+  PublicIp:
+    Value: !Sub ${CromwellStack.Outputs.PublicIp}
+  HostName:
+    Value: !Sub ${CromwellStack.Outputs.HostName}
+  CloudWatchLogStream:
+    Value: !Sub ${CromwellStack.Outputs.CloudWatchLogStream}

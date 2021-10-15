@@ -1,0 +1,158 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  (WWPS-GLS-WF-GWFCORE-LT) Creates an EC2 Launch Template for AWS Batch based
+  genomics workflows
+
+Mappings:
+  TagMap:
+    default:
+      architecture: "genomics-workflows"
+      solution: "default"
+      tags:
+        - Key: "architecture"
+          Value: "genomics-workflows"
+        - Key: "solution"
+          Value: "default"
+
+Parameters:
+  Namespace:
+    Type: String
+    Description: Namespace (e.g. project name) to use to label resources
+  KeypairName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must specify an admin access key pair for instances.
+    Description: Amazon EC2 Key Pair of server for admin access.
+  LaunchTemplateNamePrefix:
+    Type: String
+    Default: gwfcore
+    Description: Name of the launch template. This will be made unique using the Stack ID.
+  DockerStorageVolumeSize:
+    Type: Number
+    Default: 300
+    Description: The initial size of the volume Docker will use for image and metadata storage (GB)
+  S3BucketAndPrefix:
+    Type: String
+    Description: the bucketname & prefix of artifacts
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Required"
+        Parameters:
+          - Namespace
+          - KeypairName
+      - Label:
+          default: "Optional"
+        Parameters:
+          - LaunchTemplateNamePrefix
+          - DockerStorageVolumeSize
+
+Conditions:
+  NoNamespace: !Equals [ !Ref Namespace, "" ]
+
+Resources:
+  EC2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: 
+        Fn::Join: 
+          - "-"
+          - - !Ref LaunchTemplateNamePrefix
+            - Fn::If:
+                - NoNamespace
+                - !Select [2, !Split ["/", !Ref "AWS::StackId" ]]
+                - !Ref Namespace
+        
+      LaunchTemplateData:
+        # Used in tandem with UserData to check if the instance is provisioned
+        # correctly. It is important to terminate mis-provisioned instances before
+        # jobs are placed on them
+        InstanceInitiatedShutdownBehavior: terminate
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+            - Key: architecture
+              Value: !FindInMap ["TagMap", "default", "architecture"]
+        BlockDeviceMappings:
+          - Ebs:
+              DeleteOnTermination: True
+              VolumeSize: 50
+              VolumeType: gp3
+            DeviceName: /dev/xvda
+          - Ebs:
+              Encrypted: True
+              DeleteOnTermination: True
+              VolumeSize: 100
+              VolumeType: gp3
+            DeviceName: /dev/xvdcz
+          - Ebs:
+              Encrypted: True
+              DeleteOnTermination: True
+              VolumeSize: !Ref DockerStorageVolumeSize
+              VolumeType: gp3
+            DeviceName: /dev/xvdba
+        KeyName: !Ref KeypairName
+        UserData:
+          Fn::Base64:
+            Fn::Sub: |
+                MIME-Version: 1.0
+                Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+
+                --==BOUNDARY==
+                Content-Type: text/cloud-config; charset="us-ascii"
+
+                packages:
+                - jq
+                - btrfs-progs
+                - sed
+                - git
+                - amazon-ssm-agent
+                - unzip
+                - wget
+                - python2-pip
+                - curl
+
+                runcmd:
+                - pip install -i https://opentuna.cn/pypi/web/simple boto3
+                # install aws-cli v2 and copy the static binary in an easy to find location for bind-mounts into containers
+                - curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+                - unzip -q /tmp/awscliv2.zip -d /tmp
+                - /tmp/aws/install -b /usr/bin
+
+                # check that the aws-cli was actually installed. if not shutdown (terminate) the instance
+                - command -v aws || shutdown -P now
+
+                - mkdir -p /opt/aws-cli/bin
+                - export S3BucketAndPrefix=${S3BucketAndPrefix}
+                - cp -a $(dirname $(find /usr/local/aws-cli -name 'aws' -type f))/. /opt/aws-cli/bin/
+                # enable ecs spot instance draining
+                - echo ECS_ENABLE_SPOT_INSTANCE_DRAINING=true >> /etc/ecs/ecs.config
+                - aws configure set default.region $(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+                - mkdir /cromwell_root
+                # - cd /opt && wget https://zq-work.s3.cn-north-1.amazonaws.com.cn/config-template/cromwell/aws-ebs-autoscale.tgz && tar -xzf aws-ebs-autoscale.tgz
+                - cd /opt && aws s3 cp ${S3BucketAndPrefix}/aws-ebs-autoscale.tgz . && tar -xzf aws-ebs-autoscale.tgz
+                - sh /opt/ebs-autoscale/bin/init-ebs-autoscale.sh /cromwell_root /dev/xvdba  2>&1 > /var/log/init-ebs-autoscale.log
+                - cd /opt
+                - wget https://aws-genomics-workflows.s3.cn-northwest-1.amazonaws.com.cn/v3.0.3/artifacts/fetch_and_run.sh
+                - chmod a+x /opt/fetch_and_run.sh
+                - cp /opt/fetch_and_run.sh /usr/local/bin
+                # - cd /opt && wget https://zq-work.s3.cn-north-1.amazonaws.com.cn/config-template/cromwell/ecs-additions-cromwell-cn.sh
+                - cd /opt && aws s3 cp ${S3BucketAndPrefix}/ecs-additions-cromwell-cn.sh .
+                - sh /opt/ecs-additions-cromwell-cn.sh
+                # enable simple services bootup startup
+                # if you want autoscaling, add the following, other wise just ignore
+                # - /usr/local/bin/ebs-autoscale /cromwell_root >> /etc/rc.local
+                - echo 'cd /home/ec2-user && sudo -u ec2-user /usr/local/bin/supervisord' >> /etc/rc.local
+                --==BOUNDARY==--
+
+
+
+Outputs:
+  LaunchTemplateId:
+    Description: >-
+      EC2 Launch Template ID to use when creating AWS Batch compute environments
+      for genomics workflows
+    Value: !Ref EC2LaunchTemplate
+...
