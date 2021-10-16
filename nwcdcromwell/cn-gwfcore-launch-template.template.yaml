@@ -140,7 +140,7 @@ Resources:
                 - cp /opt/fetch_and_run.sh /usr/local/bin
                 # - cd /opt && wget https://zq-work.s3.cn-north-1.amazonaws.com.cn/config-template/cromwell/ecs-additions-cromwell-cn.sh
                 - cd /opt && aws s3 cp ${S3BucketAndPrefix}/ecs-additions-cromwell-cn.sh .
-                - sh /opt/ecs-additions-cromwell-cn.sh
+                - sh /opt/ecs-additions-cromwell-cn.sh ${S3BucketAndPrefix}
                 # enable simple services bootup startup
                 # if you want autoscaling, add the following, other wise just ignore
                 # - /usr/local/bin/ebs-autoscale /cromwell_root >> /etc/rc.local

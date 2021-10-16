@@ -23,6 +23,8 @@ Metadata:
           default: Optional
         Parameters:
           - Namespace
+          - ServerInstanceType
+          - DockerStorageVolumeSize
           - DefaultCEMinvCpus
           - DefaultCEMaxvCpus
           - PriorityCEMinvCpus
@@ -32,7 +34,6 @@ Metadata:
         Parameters:
           - ArtifactBucketName
           - ArtifactBucketPrefix
-          - ServerInstanceType
 
     ParameterLabels:
       S3BucketName:
@@ -81,10 +82,10 @@ Parameters:
     Description: '[*REQUIRED] The VPC to create security groups and deploy AWS Batch to. NOTE: Must be the same VPC as the provided subnet IDs.'
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
-    Description: 'Subnets you want your batch compute environment to launch in. We recommend private subnets. NOTE: Must be from the VPC provided.'
+    Description: '[*REQUIRED] Must be from the VPC you choosed! Subnets you want your batch compute environment to launch in. We recommend private subnets.'
   S3BucketName:
     Description: >-
-      [*REQUIRED] A S3 bucket name for storing analysis results.
+      [*REQUIRED] A S3 bucket name for storing ANALYSIS RESULTS (your business bucket).
       The bucket name must respect the S3 bucket naming conventions 
       (can contain lowercase letters, numbers, periods and hyphens).
     Type: String
@@ -126,7 +127,7 @@ Parameters:
   TemplateRootUrl:
     Type: String
     Description: >-
-      [*REQUIRED] Root URL for where nested templates are stored. Typically the S3 URL path of this yaml file. e.g. "https://<code-bucket-name>.s3.cn-northwest-1.amazonaws.com.cn/nwcdcromwell"
+      [*REQUIRED] Root URL for where nested templates are stored. Typically the S3 URL path of this yaml file. e.g. "https://<your-code-bucket-name>.s3.cn-northwest-1.amazonaws.com.cn/nwcdcromwell"
     ConstraintDescription: >-
       Must be a valid S3 HTTP URL
   
@@ -175,7 +176,7 @@ Parameters:
     Description: '[optional]The initial size of the volume Docker will use for image and metadata storage (GB)'
   S3BucketAndPrefix:
     Type: String
-    Description: '[*REQUIRED] The S3 bucket pathname of "nwcdcromwell/artifacts", e.g: "s3://<YOUR CODE BUCKET>/nwcdcromwell/artifacts"'
+    Description: '[*REQUIRED] The S3 bucket pathname of "nwcdcromwell/artifacts", e.g: "s3://<your-code-bucket-name>/nwcdcromwell/artifacts"'
 
 Conditions:
   NoNamespace: !Equals [ !Ref Namespace, "" ]
