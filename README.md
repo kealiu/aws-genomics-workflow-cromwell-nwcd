@@ -2,9 +2,16 @@
 
 [Github Repo](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd)
 
-## 代码 S3 Bucket
+## 下载&解压代码
 
-将 [代码repo](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd) 。推荐Github `Download Zip` 方式直接下载 zip 包。
+将 [代码repo](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd) 。推荐Github `Download Zip` 方式直接下载 zip 包。并解压
+
+**特别注意**
+> 因为github大文件上传下载有限制。所以，解压完成后的大文件是有问题的！**需要人工下载** `nwcdcromwell/artifacts/cromwell-aws-proxy.tar` 与 `nwcdcromwell/artifacts/ecs-agent-cromwell.tar` **覆盖解压后的文件**（解压出来的文件实际上只是一个文本记录了版本号）
+> [nwcdcromwell/artifacts/cromwell-aws-proxy.tar](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/nwcdcromwell/artifacts/cromwell-aws-proxy.tar)
+> [nwcdcromwell/artifacts/ecs-agent-cromwell.tar](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/nwcdcromwell/artifacts/ecs-agent-cromwell.tar)
+
+## 代码 S3 Bucket
 
 上传代码到s3 bucket: 因为cloudformation yaml模版以及自定义的文件、script需要能够在国内下载，考虑到备案等问题，我们采用s3来存储。 
 
