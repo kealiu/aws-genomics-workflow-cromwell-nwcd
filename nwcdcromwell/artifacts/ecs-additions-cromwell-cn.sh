@@ -97,6 +97,8 @@ function is_same_image() {
     echo "Images match: $1 ($left) vs $2 ($right)"
 }
 
+S3BucketAndPrefix=$1
+
 # install ecs-proxy
 PROXY_IMAGE="quay.io/broadinstitute/cromwell-aws-proxy:latest"
 # wget https://zq-work.s3.cn-north-1.amazonaws.com.cn/config-template/cromwell/artifacts/images/cromwell-aws-proxy.tar
