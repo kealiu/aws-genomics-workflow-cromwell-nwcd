@@ -6,7 +6,9 @@
 
 将 [代码repo](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd) 。推荐Github `Download Zip` 方式直接下载 zip 包。
 
-上传代码到s3 bucket: 因为cloudformation yaml模版以及自定义的文件、script需要能够下载，所以，我们需要讲本repo代码上传到一个s3 bucket。可以新建或者用已有的，确保当前使用的`aws iam user` 有对应的bucket访问权限。将 `nwcdcromwell` 目录上传到你的S3 `Bucket`。 以下用 `code-bucket-name` 引用该bucket。
+上传代码到s3 bucket: 因为cloudformation yaml模版以及自定义的文件、script需要能够在国内下载，考虑到备案等问题，我们采用s3来存储。 
+
+所以，我们需要将本repo代码上传到一个s3 bucket。可以新建或者用已有的，确保当前使用的`aws iam user` 有对应的bucket访问权限。将 `nwcdcromwell` 目录上传到你的S3 `Bucket`。 以下用 `code-bucket-name` 引用该bucket。
     1. 通过web UI 方式上传。可以直接拖放到S3 bucket页面，或者`Add Folder`方式：
         ![code-s3-bucket-upload-folder](https://github.com/kealiu/aws-genomics-workflow-cromwell-nwcd/raw/master/docs/images/code-s3-bucket-upload-folder.png)
     1. 通过 `aws cli` 方式上传: `aws s3 cp -r nwcdcromwell s3://<your-bucket>/`
